@@ -265,11 +265,11 @@ def run_patch(target_app_path=None):
 
         comp_help = brotli.compress(modified_help_js.encode('utf-8'), quality=11)
         log(f"[3/6] Compressed HelpCenter: {len(modified_help_js)} raw -> {len(comp_help)} brotli bytes (slot: {orig_help_len})", "INFO")
-        if len(comp_help) > 1277:
-            raise ValueError(f"Compressed HelpCenter ({len(comp_help)}) exceeds slot 1277!")
+        if len(comp_help) > orig_help_len:
+            raise ValueError(f"Compressed HelpCenter ({len(comp_help)}) exceeds slot {orig_help_len}!")
 
         data[help_start:help_start + len(comp_help)] = comp_help
-        data[help_start + len(comp_help):help_start + 1277] = b'\x00' * (1277 - len(comp_help))
+        data[help_start + len(comp_help):help_start + orig_help_len] = b'\x00' * (orig_help_len - len(comp_help))
 
         HELP_TABLE_ENTRY = 38445896
         data[HELP_TABLE_ENTRY:HELP_TABLE_ENTRY + 8] = struct.pack('<Q', len(comp_help))
@@ -345,9 +345,6 @@ def run_patch(target_app_path=None):
             ('label:"Starting Telegram",detail:"Initializing the secure desktop client…"', 'label:"正在启动 Telegram 核心服务",detail:"正在初始化安全桌面客户端…"'),
             ('label:"Checking your account",detail:"Confirming the session with Telegram…"', 'label:"正在验证电报账户",detail:"正在与 Telegram 官方服务器确认会话…"'),
             ('label:"Checking sponsor access",detail:"Finishing your local access checks…"', 'label:"正在完成安全校验",detail:"正在完成本地环境与权限检测…"'),
-            # 强制默认简体中文
-            ('lng:"en",fallbackLng:!1', 'lng:"zh-CN",fallbackLng:"zh-CN"'),
-            ('resources:{en:{translation:vE}}', 'resources:{"zh-CN":{translation:vE},en:{translation:vE}}'),
         ]
 
         modified_index_js = raw_index_js
@@ -408,11 +405,11 @@ def run_patch(target_app_path=None):
 
         comp_dd = brotli.compress(modified_dd_js.encode('utf-8'), quality=11)
         log(f"[5/6] Compressed DesktopDashboard: {len(modified_dd_js)} raw -> {len(comp_dd)} brotli bytes (slot: {orig_dd_len})", "INFO")
-        if len(comp_dd) > 75097:
-            raise ValueError(f"Compressed DesktopDashboard ({len(comp_dd)}) exceeds slot 75097!")
+        if len(comp_dd) > orig_dd_len:
+            raise ValueError(f"Compressed DesktopDashboard ({len(comp_dd)}) exceeds slot {orig_dd_len}!")
 
         data[dd_start:dd_start + len(comp_dd)] = comp_dd
-        data[dd_start + len(comp_dd):dd_start + 75097] = b'\x00' * (75097 - len(comp_dd))
+        data[dd_start + len(comp_dd):dd_start + orig_dd_len] = b'\x00' * (orig_dd_len - len(comp_dd))
 
         DD_TABLE_ENTRY = 38446440
         data[DD_TABLE_ENTRY:DD_TABLE_ENTRY + 8] = struct.pack('<Q', len(comp_dd))
@@ -436,12 +433,12 @@ def run_patch(target_app_path=None):
         raw_zhtw = raw_zhtw.replace('"conflicts":"Folder Sync needs attention"', '"conflicts":"目錄同步需要您處理衝突"')
 
         comp_zhtw = brotli.compress(raw_zhtw.encode('utf-8'), quality=11)
-        log(f"[6/6] Compressed zh-TW: {len(raw_zhtw)} raw -> {len(comp_zhtw)} brotli bytes (slot: 16272)", "INFO")
-        if len(comp_zhtw) > 16272:
-            raise ValueError(f"Compressed zh-TW ({len(comp_zhtw)}) exceeds slot 16272!")
+        log(f"[6/6] Compressed zh-TW: {len(raw_zhtw)} raw -> {len(comp_zhtw)} brotli bytes (slot: {orig_zhtw_len})", "INFO")
+        if len(comp_zhtw) > orig_zhtw_len:
+            raise ValueError(f"Compressed zh-TW ({len(comp_zhtw)}) exceeds slot {orig_zhtw_len}!")
 
         data[zhtw_start:zhtw_start + len(comp_zhtw)] = comp_zhtw
-        data[zhtw_start + len(comp_zhtw):zhtw_start + 16272] = b'\x00' * (16272 - len(comp_zhtw))
+        data[zhtw_start + len(comp_zhtw):zhtw_start + orig_zhtw_len] = b'\x00' * (orig_zhtw_len - len(comp_zhtw))
 
         ZHTW_TABLE_ENTRY = 38447432
         data[ZHTW_TABLE_ENTRY:ZHTW_TABLE_ENTRY + 8] = struct.pack('<Q', len(comp_zhtw))
@@ -464,7 +461,7 @@ def run_patch(target_app_path=None):
 
         dec_index = brotli.decompress(bytes(data[index_start:index_start + len(comp_index)])).decode('utf-8')
         assert '正在验证电报账户' in dec_index
-        assert 'lng:"zh-CN"' in dec_index
+        assert 'saved_messages:"我的云盘 (收藏夹)"' in dec_index
 
         dec_dd = brotli.decompress(bytes(data[dd_start:dd_start + len(comp_dd)])).decode('utf-8')
         assert '此文件夹为空' in dec_dd
@@ -475,7 +472,12 @@ def run_patch(target_app_path=None):
         assert '我的雲端硬碟 (收藏夾)' in dec_zhtw
         assert '目錄自動同步已停用' in dec_zhtw
 
-        log("All 6 slices in-memory self-verification PASSED 100%!", "SUCCESS")
+        # 边界与相邻资源完整性校验 (确保绝不越界覆写任何相邻资源)
+        assert data[help_start + orig_help_len] == 0x2f, "HelpCenter boundary corrupted next asset!"
+        assert data[dd_start + orig_dd_len] == 0x2f, "DesktopDashboard boundary corrupted next asset!"
+        assert data[zhtw_start + orig_zhtw_len] == 0x2f, "zh-TW boundary corrupted next asset!"
+
+        log("All 6 slices in-memory self-verification & boundary checks PASSED 100%!", "SUCCESS")
 
         # 10. 写入目标可执行文件
         with open(target_app_path, "wb") as f:
