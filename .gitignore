@@ -24,6 +24,10 @@ dist/
 CompiledApps/
 *.log
 *.key
+__pycache__/
+*.pyc
+logs/*.log
+!logs/.gitkeep
 Error.html
 **/LatestError.html
 
