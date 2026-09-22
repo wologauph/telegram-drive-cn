@@ -296,6 +296,51 @@ DD_REPLACEMENTS = [
     ('body:"Saved Messages is your home storage. Telegram Drive reads and writes files directly through your Telegram session."', 'body:"我的云盘 (收藏夹) 是您的基础存储空间。Telegram Drive 直接通过您的 Telegram 官方会话读写文件。"'),
     # 侧边栏与标题栏动态将 "Saved Messages" 统一映射为 "我的云盘 (收藏夹)"
     ('Wi=d===null?n("common.saved_messages"):i.find(D=>D.id===d)?.name||n("common.folders")', 'Wi=d===null?(n("common.saved_messages")==="Saved Messages"?"我的云盘 (收藏夹)":n("common.saved_messages")):(i.find(D=>D.id===d)?.name==="Saved Messages"?"我的云盘 (收藏夹)":i.find(D=>D.id===d)?.name)||n("common.folders")'),
+
+    # 创建文件夹弹窗 (CreateFolderDialog)
+    ('[r.jsx(Ga,{className:"h-4 w-4 text-app-accent"}),"Create a folder"]', '[r.jsx(Ga,{className:"h-4 w-4 text-app-accent"}),"创建文件夹"]'),
+    ('placeholder:"e.g. Project files"', 'placeholder:"例如：影视大片、项目资料、日常相册..."'),
+    ('children:"This creates a private Telegram channel that Telegram Drive presents as a folder. Its files remain in your Telegram account."', 'children:"此操作将在您的 Telegram 账户中创建一个私密频道，并在本软件中作为文件夹呈现。文件将完整保存在您的电报账户中。"'),
+    ('children:a?"Creating…":"Create private folder"', 'children:a?"正在创建…":"创建私密文件夹"'),
+
+    # 右上角三点菜单与快捷键指南
+    ('className:"h-3.5 w-3.5 text-app-text-secondary"}),"Keyboard shortcuts"]', 'className:"h-3.5 w-3.5 text-app-text-secondary"}),"快捷键指南"]'),
+    ('className:"h-3.5 w-3.5 text-app-text-secondary"}),"Help & FAQ"]', 'className:"h-3.5 w-3.5 text-app-text-secondary"}),"使用帮助与常见问题"]'),
+    ('[r.jsx(Cl,{className:"h-4 w-4 text-app-accent"}),"Keyboard shortcuts"]', '[r.jsx(Cl,{className:"h-4 w-4 text-app-accent"}),"快捷键指南"]'),
+    ('"aria-label":"Close shortcut reference"', '"aria-label":"关闭快捷键指南"'),
+    ('["⌘/Ctrl F","Search files"]', '["⌘/Ctrl F","快速搜索文件"]'),
+    ('["⌘/Ctrl A","Select all files"]', '["⌘/Ctrl A","全选所有文件"]'),
+    ('["Enter","Open the selected file"]', '["Enter","打开选中的文件"]'),
+    ('["F2","Rename the selected file"]', '["F2","重命名选中的文件"]'),
+    ('["⌘/Ctrl D","Download selection"]', '["⌘/Ctrl D","下载选中文件"]'),
+    ('["⌘/Ctrl ⇧ S","Share selection"]', '["⌘/Ctrl ⇧ S","生成分享链接"]'),
+    ('["Delete / Backspace","Delete selection"]', '["Delete / Backspace","删除选中文件"]'),
+    ('["Esc","Close the active dialog or clear selection"]', '["Esc","关闭弹窗或取消全选"]'),
+    ('["?","Show this shortcut reference"]', '["?","显示快捷键参考指南"]'),
+
+    # 筛选、排序与传输面板边角文本
+    ('children:"All Telegram Drive folders"', 'children:"所有云盘文件夹"'),
+    ('children:"All transfers complete"', 'children:"所有传输任务已完成"'),
+    ('children:"All types"', 'children:"全部文件类型"'),
+    ('children:"Archives"', 'children:"压缩包文件"'),
+    ('children:"Audio"', 'children:"音频与音乐"'),
+    ('children:"Cancel all"', 'children:"取消全部传输"'),
+    ('children:"Clear finished"', 'children:"清除已完成任务"'),
+    ('children:"Documents"', 'children:"办公与电子书"'),
+    ('children:"Downloads"', 'children:"下载队列"'),
+    ('children:"Uploads"', 'children:"上传队列"'),
+    ('children:"Images"', 'children:"图片与相册"'),
+    ('children:"Videos"', 'children:"视频大片"'),
+    ('children:"Other"', 'children:"其他文件"'),
+    ('children:"Last 7 days"', 'children:"最近 7 天"'),
+    ('children:"Last 30 days"', 'children:"最近 30 天"'),
+    ('children:"Last year"', 'children:"过去一年"'),
+    ('children:"Under 10 MB"', 'children:"10 MB 以下"'),
+    ('children:"Reset filters"', 'children:"重置所有筛选"'),
+    ('children:"Sort files"', 'children:"文件排序"'),
+    ('children:"Error loading files"', 'children:"文件列表加载失败"'),
+    ('children:"Generating share links..."', 'children:"正在生成分享直链..."'),
+    ('children:"Understood"', 'children:"我已知晓"'),
 ]
 
 CONFIG_MAP = {
@@ -465,8 +510,11 @@ def run_patch(target_app_path=None):
         if modal_pos == -1:
             raise RuntimeError(f"SettingsModal asset marker {modal_cfg['marker']} not found!")
         modal_start = modal_pos + len(modal_cfg["marker"])
+        modal_in_len = struct.unpack('<Q', data[modal_cfg["table_entry"]:modal_cfg["table_entry"] + 8])[0]
+        if modal_in_len == 0 or modal_in_len > modal_cfg["slot_len"]:
+            modal_in_len = modal_cfg["slot_len"]
 
-        raw_modal_js = brotli.decompress(bytes(data[modal_start:modal_start + modal_cfg["slot_len"]])).decode('utf-8')
+        raw_modal_js = brotli.decompress(bytes(data[modal_start:modal_start + modal_in_len])).decode('utf-8')
         modified_modal_js = raw_modal_js
         for old, new in MODAL_REPLACEMENTS:
             if old in modified_modal_js:
@@ -491,8 +539,11 @@ def run_patch(target_app_path=None):
         if help_pos == -1:
             raise RuntimeError(f"HelpCenterDialog asset marker {help_cfg['marker']} not found!")
         help_start = help_pos + len(help_cfg["marker"])
+        help_in_len = struct.unpack('<Q', data[help_cfg["table_entry"]:help_cfg["table_entry"] + 8])[0]
+        if help_in_len == 0 or help_in_len > help_cfg["slot_len"]:
+            help_in_len = help_cfg["slot_len"]
 
-        raw_help_js = brotli.decompress(bytes(data[help_start:help_start + help_cfg["slot_len"]])).decode('utf-8')
+        raw_help_js = brotli.decompress(bytes(data[help_start:help_start + help_in_len])).decode('utf-8')
         modified_help_js = raw_help_js
         for old, new in HELP_REPLACEMENTS:
             if old in modified_help_js:
@@ -517,8 +568,11 @@ def run_patch(target_app_path=None):
         if idx_pos == -1:
             raise RuntimeError(f"index asset marker {idx_cfg['marker']} not found!")
         idx_start = idx_pos + len(idx_cfg["marker"])
+        idx_in_len = struct.unpack('<Q', data[idx_cfg["table_entry"]:idx_cfg["table_entry"] + 8])[0]
+        if idx_in_len == 0 or idx_in_len > idx_cfg["slot_len"]:
+            idx_in_len = idx_cfg["slot_len"]
 
-        raw_index_js = brotli.decompress(bytes(data[idx_start:idx_start + idx_cfg["slot_len"]])).decode('utf-8')
+        raw_index_js = brotli.decompress(bytes(data[idx_start:idx_start + idx_in_len])).decode('utf-8')
         modified_index_js = raw_index_js
         for old, new in INDEX_REPLACEMENTS:
             if old in modified_index_js:
@@ -551,8 +605,11 @@ def run_patch(target_app_path=None):
         if dd_pos == -1:
             raise RuntimeError(f"DesktopDashboard asset marker {dd_cfg['marker']} not found!")
         dd_start = dd_pos + len(dd_cfg["marker"])
+        dd_in_len = struct.unpack('<Q', data[dd_cfg["table_entry"]:dd_cfg["table_entry"] + 8])[0]
+        if dd_in_len == 0 or dd_in_len > dd_cfg["slot_len"]:
+            dd_in_len = dd_cfg["slot_len"]
 
-        raw_dd_js = brotli.decompress(bytes(data[dd_start:dd_start + dd_cfg["slot_len"]])).decode('utf-8')
+        raw_dd_js = brotli.decompress(bytes(data[dd_start:dd_start + dd_in_len])).decode('utf-8')
         modified_dd_js = raw_dd_js
         for old, new in DD_REPLACEMENTS:
             if old in modified_dd_js:
@@ -585,8 +642,11 @@ def run_patch(target_app_path=None):
         if tw_pos == -1:
             raise RuntimeError(f"zh-TW asset marker {tw_cfg['marker']} not found!")
         tw_start = tw_pos + len(tw_cfg["marker"])
+        tw_in_len = struct.unpack('<Q', data[tw_cfg["table_entry"]:tw_cfg["table_entry"] + 8])[0]
+        if tw_in_len == 0 or tw_in_len > tw_cfg["slot_len"]:
+            tw_in_len = tw_cfg["slot_len"]
 
-        raw_zhtw = brotli.decompress(bytes(data[tw_start:tw_start + tw_cfg["slot_len"]])).decode('utf-8')
+        raw_zhtw = brotli.decompress(bytes(data[tw_start:tw_start + tw_in_len])).decode('utf-8')
         raw_zhtw = raw_zhtw.replace('"saved_messages":"Saved Messages"', '"saved_messages":"我的雲端硬碟 (收藏夾)"')
         raw_zhtw = raw_zhtw.replace('"disabled":"Folder Sync disabled"', '"disabled":"目錄自動同步已停用"')
         raw_zhtw = raw_zhtw.replace('"syncing":"Folder Sync running"', '"syncing":"目錄同步正在運行中..."')
