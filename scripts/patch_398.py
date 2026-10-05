@@ -461,6 +461,43 @@ MODAL_REPLACEMENTS = [
     ('"aria-label":"Close local access explanation"', '"aria-label":"关闭说明"'),
     ('title:"Copy to clipboard"', 'title:"复制到剪贴板"'),
     ('"Periodically check connectivity and display latency"', '"定时检测网络连通性并显示延迟"'),
+
+    # WebDAV 与 REST 本地挂载工作原理说明弹窗
+    ('b?"How WebDAV access works":"How REST access works"', 'b?"WebDAV 本地磁盘挂载机制说明":"REST API 自动化接口机制说明"'),
+    ('children:"The server runs on this device and port only after you enable it. Network and firewall rules determine which other devices can reach that address."', 'children:"该服务仅在您主动开启后才在当前设备及指定端口上运行。网络及防火墙规则决定了其他设备是否能访问该地址。"'),
+    ('b?"The complete /dav/<token>/ URL is the credential. Guest or anonymous login without that token has no access.":"Every request must provide the generated API key. Regenerating it immediately revokes clients using the previous key."', 'b?"包含完整 Token 的 /dav/<token>/ 网址即为安全凭证。未携带该 Token 的访客或匿名登录将无法访问。":"每个请求都必须提供生成的 API 密钥。重新生成密钥将立即撤销使用旧密钥的所有客户端。"'),
+    ('children:"Protected-file limitation:"', 'children:"加密文件访问限制："'),
+    ('local access does not bypass encryption. The vault may need to be unlocked, and unsupported third-party workflows fail closed rather than receive plaintext.', '本地访问不会绕过端到端加密。可能需要先解锁保险库；不支持的第三方工作流将直接拒绝访问，绝不会泄露明文。'),
+
+    # 主题说明
+    ('"Default restores the Quiet Utility theme. System follows your device, while presets and custom themes override these standard modes."', '"默认将恢复至 Quiet Utility 原生主题。系统模式跟随操作系统外观，而预设与自定义主题将优先覆盖这些标准模式。"'),
+
+    # 端到端加密与保险库恢复演练 (Vault Recovery Drill) 弹窗全景汉化
+    ('"Authenticate before changing the vault passphrase"', '"修改加密保险库密码前请先验证身份"'),
+    ('"Authenticate before exporting vault recovery material"', '"导出保险库恢复包前请先验证身份"'),
+    ('"Authenticate before importing vault recovery material"', '"导入保险库恢复包前请先验证身份"'),
+    ('"Create recovery bundle"', '"创建恢复备份包"'),
+    ('"Creating bundle\u2026"', '"正在生成恢复包…"'),
+    ('"Generated recovery bundle"', '"已生成恢复备份包"'),
+    ('"New recovery-bundle passphrase"', '"设置新恢复包加密口令"'),
+    ('"Paste the recovery bundle you saved"', '"粘贴您备份的恢复包数据"'),
+    ('"Paste the saved bundle and enter its passphrase. This performs a real import and verifies that the recovered vault material is usable."', '"粘贴保存的恢复包并输入其口令。这将执行真实导入演练，以验证恢复出来的保险库密钥真实可用。"'),
+    ('"I saved this bundle somewhere separate from this device."', '"我已将此恢复包离线保存在脱离本机的安全位置。"'),
+    ('"Continue to restore test"', '"继续执行恢复演练测试"'),
+    ('"Recovery bundle passphrase"', '"恢复包口令"'),
+    ('"Recovery bundle to verify"', '"待验证的恢复包"'),
+    ('"Recovery verification passphrase"', '"恢复验证口令"'),
+    ('"Recovery-bundle passphrase"', '"恢复包口令"'),
+    ('"Required recovery drill"', '"必须完成的恢复演练"'),
+    ('"Restore and finish setup"', '"恢复并完成安全设置"'),
+    ('"Restore drill verified"', '"恢复演练已通过验证"'),
+    ('"Recovery drill passed. Your vault setup is complete."', '"恢复演练顺利通过！您的端到端加密保险库设置已全部就绪。"'),
+    ('"Testing recovery\u2026"', '"正在测试恢复演练…"'),
+    ('"Unlocked for this session"', '"当前会话已解锁"'),
+    ('"Vault created. Complete the recovery drill before protected uploads are enabled by default."', '"保险库已成功创建。请先完成一次恢复演练，以默认开启端到端加密保护上传。"'),
+    ('"Your vault exists, but setup is not complete until you export a recovery bundle and prove it can be restored."', '"您的加密库已存在，但仍需导出一份恢复包并证明其能成功恢复，以彻底确保资产万无一失。"'),
+    ('"Protection is disabled for safety because the local security service did not pass its startup check. Retry the check; existing files remain untouched."', '"为安全起见，由于本地安全服务未通过自检，保护功能已暂时停用。请重试检测；现有文件不受任何影响。"'),
+    ('"Protection remains paused until the safety check succeeds. Existing files are left unchanged."', '"在安全检测成功前，加密保护将保持暂停。现有文件保持原样。"'),
 ]
 
 # =========================================================================
@@ -752,6 +789,12 @@ def run_patch():
         mod_dd = mod_dd.replace(dialog_target, 'return null;/*d*/s.jsx("div",{className:"fixed inset-0 z-[260]')
         log("[KILL] Neutralized supporter dialog in DesktopDashboard (return null)", "CLEAN")
 
+    # 彻底封杀 SupporterOfferDialog 弹窗挂载 (解决启动和传输完成弹出赞助)
+    supp_mount = 'V&&s.jsx(pt,{children:s.jsx(mh,{trigger:V'
+    if supp_mount in mod_dd:
+        mod_dd = mod_dd.replace(supp_mount, '!1&&s.jsx(pt,{children:s.jsx(mh,{trigger:V')
+        log("[KILL] Neutralized SupporterOfferDialog mount in DesktopDashboard (!1&&...)", "CLEAN")
+
     comp_dd = brotli.compress(mod_dd.encode('utf-8'), quality=11)
     log(f"[4/6] Compressed DesktopDashboard: {len(mod_dd)} raw -> {len(comp_dd)} brotli bytes (slot: {dd_slot_len})", "INFO")
     if len(comp_dd) > dd_slot_len:
@@ -821,6 +864,23 @@ def run_patch():
     data[tw_start + len(comp_tw):tw_start + tw_slot_len] = b'\x00' * (tw_slot_len - len(comp_tw))
     data[tw_table_entry:tw_table_entry + 8] = struct.pack('<Q', len(comp_tw))
     log(f"[6/6] zh-TW table entry updated at {tw_table_entry}: len={len(comp_tw)}", "SUCCESS")
+
+    # 7. Patch Slice 7: SupporterOfferDialog-BhSlxpEY.js (斩断弹窗组件本体)
+    supp_marker = b"/assets/SupporterOfferDialog-BhSlxpEY.js"
+    supp_pos = data.find(supp_marker)
+    if supp_pos != -1:
+        supp_slot_len = 1681
+        supp_table_entry = 38518872
+        supp_start = supp_pos + len(supp_marker)
+        raw_supp = brotli.decompress(bytes(data[supp_start:supp_start + supp_slot_len])).decode('utf-8')
+        target_fn = 'function v({trigger:r,presentation:n="dialog",onClose:s,onOpenSupporter:p}){'
+        if target_fn in raw_supp:
+            mod_supp = raw_supp.replace(target_fn, target_fn + 'return null;')
+            comp_supp = brotli.compress(mod_supp.encode('utf-8'), quality=11)
+            data[supp_start:supp_start + len(comp_supp)] = comp_supp
+            data[supp_start + len(comp_supp):supp_start + supp_slot_len] = b'\x00' * (supp_slot_len - len(comp_supp))
+            data[supp_table_entry:supp_table_entry + 8] = struct.pack('<Q', len(comp_supp))
+            log("[7/7] SupporterOfferDialog component neutralized with 'return null'", "CLEAN")
 
     # 边界断言自检
     assert data[zh_start + zh_slot_len] == 0x2f, "zh-CN boundary corrupted!"
