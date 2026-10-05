@@ -1,4 +1,4 @@
-﻿# ==============================================================================
+# ==============================================================================
 # Telegram Drive 双账号极速分流与直登管家 (switch_account.ps1)
 # 银月独立开发工坊 · 车间法宝出品
 # ==============================================================================
@@ -31,6 +31,12 @@ if (Test-Path $activeFlagFile) {
     if ($rawVal) { $currentActive = $rawVal.Trim() }
 }
 
+function Set-JsonNoBom {
+    param([string]$Path, [string]$Content)
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($Path, $Content, $utf8NoBom)
+}
+
 # 1. 代理自适应探测与同步（支持 7897 / 7890 / 2080 / 10808 等主流代理）
 function Update-ProxySettings {
     param([string]$targetDir)
@@ -51,7 +57,8 @@ function Update-ProxySettings {
             $netCfg.proxy.host = "127.0.0.1"
             $netCfg.proxy.enabled = $true
             $netCfg.proxy.proxy_type = "socks5"
-            $netCfg | ConvertTo-Json -Depth 6 | Set-Content $netPath -Encoding UTF8
+            $jsonStr = $netCfg | ConvertTo-Json -Depth 6
+            Set-JsonNoBom -Path $netPath -Content $jsonStr
         }
     } catch {
         # 宽容处理，不阻塞主流程
@@ -164,9 +171,11 @@ if ($saveDir -and (Test-Path $saveDir)) {
         try {
             $validTest = Get-Content $curConfig -Raw -Encoding UTF8 | ConvertFrom-Json
             if ($validTest) {
-                # 确保保存的配置始终含有正确的 api_id
+                # 确保保存的配置始终含有正确的 api_id 和 api_hash
                 $validTest.api_id = "37459146"
-                $validTest | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $saveDir "config.json") -Encoding UTF8
+                $validTest.api_hash = "fa18fb36a807ef01a98b1d4dae253936"
+                $saveJsonStr = $validTest | ConvertTo-Json -Depth 10
+                Set-JsonNoBom -Path (Join-Path $saveDir "config.json") -Content $saveJsonStr
             }
         } catch {}
     }
@@ -189,14 +198,16 @@ if ($Account -eq "610") {
     exit 1
 }
 
-# 恢复配置文件并固化 api_id
+# 恢复配置文件并固化 api_id 和 api_hash
 $targetConfig = Join-Path $targetDir "config.json"
 if (Test-Path $targetConfig) {
     try {
         $tCfg = Get-Content $targetConfig -Raw -Encoding UTF8 | ConvertFrom-Json
         $tCfg.api_id = "37459146"
+        $tCfg.api_hash = "fa18fb36a807ef01a98b1d4dae253936"
         $tCfg.ad_gateway_passed = $true
-        $tCfg | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $appDataDir "config.json") -Encoding UTF8
+        $targetJsonStr = $tCfg | ConvertTo-Json -Depth 10
+        Set-JsonNoBom -Path (Join-Path $appDataDir "config.json") -Content $targetJsonStr
     } catch {
         Copy-Item $targetConfig (Join-Path $appDataDir "config.json") -Force
     }

@@ -429,7 +429,9 @@ CONFIG_MAP = {
 }
 
 def detect_version(data):
-    if b'assets/SettingsModal-oXnDhTf9.js' in data:
+    if b'assets/SettingsModal-DtYCi5g8.js' in data:
+        return "3.9.8"
+    elif b'assets/SettingsModal-oXnDhTf9.js' in data:
         return "3.9.5"
     elif b'assets/SettingsModal-B1qI0t1k.js' in data:
         return "3.9.0"
@@ -437,7 +439,7 @@ def detect_version(data):
 
 def run_patch(target_app_path=None):
     with open(LATEST_LOG, "w", encoding="utf-8") as f:
-        f.write(f"=== Telegram Drive Patch Engine v4.0 Run: {NOW.strftime('%Y-%m-%d %H:%M:%S')} ===\n")
+        f.write(f"=== Telegram Drive Patch Engine v5.0 Run: {NOW.strftime('%Y-%m-%d %H:%M:%S')} ===\n")
 
     if not target_app_path:
         default_paths = [
@@ -453,6 +455,14 @@ def run_patch(target_app_path=None):
     if not target_app_path or not os.path.exists(target_app_path):
         log(f"Target executable not found at: {target_app_path}", "ERROR")
         return False
+
+    with open(target_app_path, "rb") as f:
+        head_data = f.read(45000000)
+    ver = detect_version(head_data)
+    if ver == "3.9.8":
+        log("Detected Telegram Drive v3.9.8! Dispatching to v5.0 patch engine...", "SUCCESS")
+        import patch_398
+        return patch_398.run_patch()
 
     log(f"Target binary identified: {target_app_path}", "INFO")
     backup_path = target_app_path + ".bak"
